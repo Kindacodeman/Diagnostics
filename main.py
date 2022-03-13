@@ -51,8 +51,7 @@ with sidebar:
     if not file == None:
         tar = tarfile.open(fileobj=file, mode="r:gz")
         tarmembers = tar.getnames()
-        st.balloons()
-
+        
         # -- Export specific files within the diagnostics
         tarmanager = tar.extractfile("./chargemanager.ini")
         tarjournal = tar.extractfile("./journal.json")
