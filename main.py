@@ -70,10 +70,11 @@ with sidebar:
         dfManager.columns = ["Value"]
         
         if dfManager is not None:
+            CBID = "Old Station"
             try:
                 CBID = dfManager.loc['chargeboxidentity']['Value']
-            else:
-                CBID = Old Station
+            
+                
         # -- Import platform.conf as dfPlatform
         dfPlatform = pd.read_csv(tarplatform, delimiter="=", on_bad_lines='skip', usecols=[0,1])
         dfPlatform.columns = ["Key", "Value"]
