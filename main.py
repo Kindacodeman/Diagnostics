@@ -70,9 +70,10 @@ with sidebar:
         dfManager.columns = ["Value"]
         
         if dfManager is not None:
+                    
             try:
                 CBID = dfManager.loc['chargeboxidentity']['Value']
-            else:
+            except:
                 CBID = "Old Station"
          
         # -- Import platform.conf as dfPlatform
