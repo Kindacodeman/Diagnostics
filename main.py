@@ -86,9 +86,9 @@ with sidebar:
                 model = dfPlatform.loc['model']['Value']
                 mfgdate = dfPlatform.loc['mfgdate']['Value']
             except:
-                modelversion = Old
-                model = Old
-                mfgdate = Old
+                modelversion = "Old"
+                model = "Old"
+                mfgdate = "Old"
         
 
         # -- Import nanogrid and nanogridnode if they exist
