@@ -40,6 +40,7 @@ dfRight = None
 dfnanogrid = None
 dfnanogridnode = None
 tarnanogrid = None
+dfManager = None
 
 
 with sidebar:
@@ -67,8 +68,12 @@ with sidebar:
         # -- Import chargemanager.ini as dfManager
         dfManager = pd.read_csv(tarmanager, delimiter="=", on_bad_lines='skip')
         dfManager.columns = ["Value"]
-        CBID = dfManager.loc['chargeboxidentity']['Value']
-
+        
+        if dfManager is not None:
+            try:
+                CBID = dfManager.loc['chargeboxidentity']['Value']
+            else:
+                CBID = Old Station
         # -- Import platform.conf as dfPlatform
         dfPlatform = pd.read_csv(tarplatform, delimiter="=", on_bad_lines='skip', usecols=[0,1])
         dfPlatform.columns = ["Key", "Value"]
