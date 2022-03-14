@@ -71,7 +71,7 @@ with sidebar:
         
         if dfManager is not None:
             try:
-            CBID = dfManager.loc['chargeboxidentity']['Value']
+                CBID = dfManager.loc['chargeboxidentity']['Value']
             else:
                 CBID = "Old Station"
          
