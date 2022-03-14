@@ -41,6 +41,7 @@ dfnanogrid = None
 dfnanogridnode = None
 tarnanogrid = None
 dfManager = None
+dfPlatform = None
 
 
 with sidebar:
@@ -69,8 +70,7 @@ with sidebar:
         dfManager = pd.read_csv(tarmanager, delimiter="=", on_bad_lines='skip')
         dfManager.columns = ["Value"]
         
-        if dfManager is not None:
-                    
+        if dfManager is not None:                    
             try:
                 CBID = dfManager.loc['chargeboxidentity']['Value']
             except:
@@ -80,9 +80,16 @@ with sidebar:
         dfPlatform = pd.read_csv(tarplatform, delimiter="=", on_bad_lines='skip', usecols=[0,1])
         dfPlatform.columns = ["Key", "Value"]
         dfPlatform.set_index('Key', inplace=True)
-        modelversion = dfPlatform.loc['modelversion']['Value']
-        model = dfPlatform.loc['model']['Value']
-        mfgdate = dfPlatform.loc['mfgdate']['Value']
+        if dfPlatform is not None:
+            try:
+                modelversion = dfPlatform.loc['modelversion']['Value']
+                model = dfPlatform.loc['model']['Value']
+                mfgdate = dfPlatform.loc['mfgdate']['Value']
+            except:
+                modelversion = Old
+                model = Old
+                mfgdate = Old
+        
 
         # -- Import nanogrid and nanogridnode if they exist
         if tarnanogrid is not None:
