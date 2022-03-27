@@ -40,20 +40,23 @@ dfRight = None
 dfnanogrid = None
 dfnanogridnode = None
 tarnanogrid = None
-dfManager = None
-dfPlatform = None
-
+dfnanogridL1 = None
+dfnanogridL2 = None
+dfnanogridL3 = None
+dfnanogridL1Reserved = None
+dfnanogridL2Reserved = None
+dfnanogridL3Reserved = None
+dfgridcentral = None
 
 with sidebar:
     st.sidebar.title("Selection:")
-
     st.sidebar.subheader("Select a .tgz ")
     file = st.sidebar.file_uploader("Fileselector", type="tgz")
 
     if not file == None:
         tar = tarfile.open(fileobj=file, mode="r:gz")
         tarmembers = tar.getnames()
-        
+
         # -- Export specific files within the diagnostics
         tarmanager = tar.extractfile("./chargemanager.ini")
         tarjournal = tar.extractfile("./journal.json")
@@ -69,27 +72,33 @@ with sidebar:
         # -- Import chargemanager.ini as dfManager
         dfManager = pd.read_csv(tarmanager, delimiter="=", on_bad_lines='skip')
         dfManager.columns = ["Value"]
-        
-        if dfManager is not None:                    
-            try:
-                CBID = dfManager.loc['chargeboxidentity']['Value']
-            except:
-                CBID = "Old Station"
-         
+        CBID = "CBID not available in Chargemanager.ini"
+        CBID = dfManager.loc['chargeboxidentity']['Value']
+
         # -- Import platform.conf as dfPlatform
         dfPlatform = pd.read_csv(tarplatform, delimiter="=", on_bad_lines='skip', usecols=[0,1])
         dfPlatform.columns = ["Key", "Value"]
         dfPlatform.set_index('Key', inplace=True)
-        if dfPlatform is not None:
+
+        if dfPlatform.empty == False:
+            try:
+                model = dfPlatform.loc['model']['Value']
+
+            except KeyError:
+                model = "## Model not found in Platform.ini ##"
+
+        if dfPlatform.empty == False:
             try:
                 modelversion = dfPlatform.loc['modelversion']['Value']
-                model = dfPlatform.loc['model']['Value']
+            except KeyError:
+                modelversion = "## Modelversion not found in Platform.ini ##"
+
+        if dfPlatform.empty == False:
+            try:
                 mfgdate = dfPlatform.loc['mfgdate']['Value']
-            except:
-                modelversion = "Old"
-                model = "Old"
-                mfgdate = "Old"
-        
+            except KeyError:
+                mfgdate = "## mfgdate not found in Platform.ini ##"
+
 
         # -- Import nanogrid and nanogridnode if they exist
         if tarnanogrid is not None:
@@ -132,6 +141,31 @@ with sidebar:
                 ['PWM', 'Draw L1', 'Draw L2', 'Draw L3']].apply(
                 pd.to_numeric)
 
+        LeftOutletCheckOld = dfMessages['MESSAGE'].str.startswith('[pwrctl] _logOutletStatus "Left').values.tolist()
+
+        if LeftOutlet in LeftOutletCheckOld:
+            dfLeft = dfMessages.copy()
+            pd.DataFrame(dfLeft)
+            dfLeft = dfLeft[(dfLeft['MESSAGE'].str.startswith('[pwrctl] _logOutletStatus "Left'))]
+            dfLeftSplit = dfLeft['MESSAGE'].str.split(' ', n=-1, expand=True)
+            dfLeft = dfLeft.drop(columns='MESSAGE')
+            dfLeft = pd.merge(dfLeft, dfLeftSplit, left_index=True, right_index=True)
+
+            dfLeft.rename(
+                columns={
+                    4: "PWM",
+                    6: "Phases",
+                    8: "Draw L1",
+                    9: "Draw L2",
+                    10: "Draw L3",
+                    12: "State"
+                }, inplace=True)
+            dfLeft.drop(columns=[0, 1, 2, 3, 5, 7, 11], inplace=True)
+            dfLeft[['PWM', 'Draw L1', 'Draw L2', 'Draw L3']] = dfLeft[
+                ['PWM', 'Draw L1', 'Draw L2', 'Draw L3']].apply(
+                pd.to_numeric)
+
+
         # -- Right outlet messages
         RightOutlet = True
         RightOutletCheck = dfMessages['MESSAGE'].str.startswith('[pwrctl.simple] _outletStatus "Right').values.tolist()
@@ -158,7 +192,29 @@ with sidebar:
                 ['PWM', 'Draw L1', 'Draw L2', 'Draw L3']].apply(
                 pd.to_numeric)
 
+        RightOutletCheckOld = dfMessages['MESSAGE'].str.startswith('[pwrctl] _logOutletStatus "Right').values.tolist()
 
+        if RightOutlet in RightOutletCheckOld:
+            dfRight = dfMessages.copy()
+            pd.DataFrame(dfRight)
+            dfRight = dfRight[(dfRight['MESSAGE'].str.startswith('[pwrctl] _logOutletStatus "Right'))]
+            dfRightSplit = dfRight['MESSAGE'].str.split(' ', n=-1, expand=True)
+            dfRight = dfRight.drop(columns='MESSAGE')
+            dfRight = pd.merge(dfRight, dfRightSplit, left_index=True, right_index=True)
+
+            dfRight.rename(
+                columns={
+                    4: "PWM",
+                    6: "Phases",
+                    8: "Draw L1",
+                    9: "Draw L2",
+                    10: "Draw L3",
+                    12: "State"
+                }, inplace=True)
+            dfRight.drop(columns=[0, 1, 2, 3, 5, 7, 11], inplace=True)
+            dfRight[['PWM', 'Draw L1', 'Draw L2', 'Draw L3']] = dfRight[
+                ['PWM', 'Draw L1', 'Draw L2', 'Draw L3']].apply(
+                pd.to_numeric)
         # -- Backend messages
         Backend = True
         BackendCheck = dfMessages['MESSAGE'].str.startswith('[ws.plain]').values.tolist()
@@ -167,7 +223,7 @@ with sidebar:
             dfBackend = dfMessages.copy()
             pd.DataFrame(dfBackend)
             dfBackendNew = dfBackend[(dfBackend['MESSAGE'].str.startswith('[ws.plain]'))]
-            dfBackend=dfBackendNew
+            dfBackend = dfBackendNew
 
         # -- ngHome - Initiated if message starts with [pwrctl.ng-home] _logTotalDraw totalDraw
         ngHome = True
@@ -299,6 +355,8 @@ with sidebar:
             ConnectedStations = dfnanogridstation.CBID.unique()
 
             figNanogridLine = go.Figure()
+            dfnanogridstation.drop(dfnanogridstation.index[dfnanogridstation['CBID'] == "allocateFallback"], inplace=True)
+
             dfnanogridstation[['Reserved A']] = dfnanogridstation[['Reserved A']].apply(pd.to_numeric)
             dfnanogridstation[['Time']] = dfnanogridstation[['Time']].apply(pd.to_datetime)
             dfnanototalload = dfnanogridstation[['Time', 'Reserved A']].copy()
@@ -307,37 +365,29 @@ with sidebar:
             dfnanogridstation.drop(columns=['Outlet'], inplace=True)
 
             dfnanogridPhase = dfnanogridstation.groupby('Phase')
-            dfnanogridL1 = dfnanogridPhase.get_group('"L1"')
-            dfnanogridL2 = dfnanogridPhase.get_group('"L2"')
-            dfnanogridL3 = dfnanogridPhase.get_group('"L3"')
 
-            dfnanogridL1Reserved = dfnanogridL1.pivot(values=['Reserved A'], index=['Time'], columns=['CBID'])
-            dfnanogridL2Reserved = dfnanogridL2.pivot(values=['Reserved A'], index=['Time'], columns=['CBID'])
-            dfnanogridL3Reserved = dfnanogridL3.pivot(values=['Reserved A'], index=['Time'], columns=['CBID'])
+            if dfnanogridPhase:
+                try:
+                    dfnanogridL1 = dfnanogridPhase.get_group('"L1"')
+                except KeyError:
+                    with nanogridcol1:
+                        st.error("No load registered on L1 in Nanogrid")
 
-            dfnanogridL1Reserved.interpolate(method='linear', axis=0, inplace=True)
-            dfnanogridL2Reserved.interpolate(method='linear', axis=0, inplace=True)
-            dfnanogridL3Reserved.interpolate(method='linear', axis=0, inplace=True)
+            if dfnanogridPhase:
+                try:
+                    dfnanogridL2 = dfnanogridPhase.get_group('"L2"')
+                except KeyError:
+                    with nanogridcol1:
+                        st.error("No load registered on L2 in Nanogrid")
+            if dfnanogridPhase:
+                try:
+                    dfnanogridL3 = dfnanogridPhase.get_group('"L3"')
+                except KeyError:
+                    with nanogridcol1:
+                        st.error("No load registered on L3 in Nanogrid")
+
 
             dfTotal = pd.DataFrame()
-            dfTotal['L1'] = dfnanogridL1Reserved[list(dfnanogridL1Reserved.columns)].sum(axis=1).copy()
-            dfTotal['L2'] = dfnanogridL2Reserved[list(dfnanogridL2Reserved.columns)].sum(axis=1).copy()
-            dfTotal['L3'] = dfnanogridL3Reserved[list(dfnanogridL3Reserved.columns)].sum(axis=1).copy()
-            dfTotal.interpolate(method='pad', axis=0, inplace=True)
-            dfTotal.reset_index(inplace=True)
-
-            dfnanogridL1Reserved = dfnanogridL1Reserved.stack(1)
-            dfnanogridL2Reserved = dfnanogridL2Reserved.stack(1)
-            dfnanogridL3Reserved = dfnanogridL3Reserved.stack(1)
-
-            dfnanogridL1Reserved.reset_index(inplace=True)
-            dfnanogridL2Reserved.reset_index(inplace=True)
-            dfnanogridL3Reserved.reset_index(inplace=True)
-
-            dfnanogridL1Reserved = dict(tuple(dfnanogridL1Reserved.groupby('CBID')))
-            dfnanogridL2Reserved = dict(tuple(dfnanogridL2Reserved.groupby('CBID')))
-            dfnanogridL3Reserved = dict(tuple(dfnanogridL3Reserved.groupby('CBID')))
-
 
             def displayreserved(X, Y):
                 for i, X in X.items():
@@ -356,30 +406,56 @@ with sidebar:
                                               height=450,
                                               plot_bgcolor="#f6f8fb")
 
+            if dfnanogridL1 is not None:
+                dfnanogridL1Reserved = dfnanogridL1.pivot(values=['Reserved A'], index=['Time'], columns=['CBID'])
+                dfnanogridL1Reserved.interpolate(method='linear', axis=0, inplace=True)
+                dfTotal['L1'] = dfnanogridL1Reserved[list(dfnanogridL1Reserved.columns)].sum(axis=1).copy()
+            if dfnanogridL2 is not None:
+                dfnanogridL2Reserved = dfnanogridL2.pivot(values=['Reserved A'], index=['Time'], columns=['CBID'])
+                dfnanogridL2Reserved.interpolate(method='linear', axis=0, inplace=True)
+                dfTotal['L2'] = dfnanogridL2Reserved[list(dfnanogridL2Reserved.columns)].sum(axis=1).copy()
+            if dfnanogridL3 is not None:
+                dfnanogridL3Reserved = dfnanogridL3.pivot(values=['Reserved A'], index=['Time'], columns=['CBID'])
+                dfnanogridL3Reserved.interpolate(method='linear', axis=0, inplace=True)
+                dfTotal['L3'] = dfnanogridL3Reserved[list(dfnanogridL3Reserved.columns)].sum(axis=1).copy()
 
-            displayreserved(dfnanogridL1Reserved, 'L1')
-            displayreserved(dfnanogridL2Reserved, 'L2')
-            displayreserved(dfnanogridL3Reserved, 'L3')
 
-            figNanogridLine.add_trace(go.Scatter(x=dfTotal.Time, y=dfTotal['L1'],
-                                                 legendgrouptitle_text='TotalReserved',
-                                                 legendgroup='TotalReserved',
-                                                 mode='lines', name="L1-Total",
-                                                 line=dict(width=2, color='#AA3F01'),
-                                                 opacity=1, ))
-            figNanogridLine.add_trace(go.Scatter(x=dfTotal.Time, y=dfTotal['L2'],
-                                                 legendgrouptitle_text='TotalReserved',
-                                                 legendgroup='TotalReserved',
-                                                 mode='lines', name="L2-Total",
-                                                 line=dict(width=2, color='#000000'),
-                                                 opacity=1, ))
-            figNanogridLine.add_trace(go.Scatter(x=dfTotal.Time, y=dfTotal['L3'],
-                                                 legendgrouptitle_text='TotalReserved',
-                                                 legendgroup='TotalReserved',
-                                                 mode='lines', name="L3-Total",
-                                                 line=dict(width=2, color='#A6A6A6'),
-                                                 opacity=1, ))
+            dfTotal.interpolate(method='pad', axis=0, inplace=True)
+            dfTotal.reset_index(inplace=True)
 
+            if dfnanogridL1 is not None:
+                dfnanogridL1Reserved = dfnanogridL1Reserved.stack(1)
+                dfnanogridL1Reserved.reset_index(inplace=True)
+                dfnanogridL1Reserved = dict(tuple(dfnanogridL1Reserved.groupby('CBID')))
+                displayreserved(dfnanogridL1Reserved, 'L1')
+                figNanogridLine.add_trace(go.Scatter(x=dfTotal.Time, y=dfTotal['L1'],
+                                                     legendgrouptitle_text='TotalReserved',
+                                                     legendgroup='TotalReserved',
+                                                     mode='lines', name="L1-Total",
+                                                     line=dict(width=2, color='#AA3F01'),
+                                                     opacity=1, ))
+            if dfnanogridL2 is not None:
+                dfnanogridL2Reserved = dfnanogridL2Reserved.stack(1)
+                dfnanogridL2Reserved.reset_index(inplace=True)
+                dfnanogridL2Reserved = dict(tuple(dfnanogridL2Reserved.groupby('CBID')))
+                displayreserved(dfnanogridL2Reserved, 'L2')
+                figNanogridLine.add_trace(go.Scatter(x=dfTotal.Time, y=dfTotal['L2'],
+                                                     legendgrouptitle_text='TotalReserved',
+                                                     legendgroup='TotalReserved',
+                                                     mode='lines', name="L2-Total",
+                                                     line=dict(width=2, color='#000000'),
+                                                     opacity=1, ))
+            if dfnanogridL3 is not None:
+                dfnanogridL3Reserved = dfnanogridL3Reserved.stack(1)
+                dfnanogridL3Reserved.reset_index(inplace=True)
+                dfnanogridL3Reserved = dict(tuple(dfnanogridL3Reserved.groupby('CBID')))
+                displayreserved(dfnanogridL3Reserved, 'L3')
+                figNanogridLine.add_trace(go.Scatter(x=dfTotal.Time, y=dfTotal['L3'],
+                                                     legendgrouptitle_text='TotalReserved',
+                                                     legendgroup='TotalReserved',
+                                                     mode='lines', name="L3-Total",
+                                                     line=dict(width=2, color='#A6A6A6'),
+                                                     opacity=1, ))
 
 
 # -- Visualize and structure of the data
@@ -721,6 +797,7 @@ with sidebar:
                 st.subheader('Nanogrid Allocated')
                 st.write(figNanogridLine)
 
+        if dfgridcentral is not None:
             if st.sidebar.checkbox("Gridcentral Measured Load", value=True):
                 with gridcentralcol2:
                     figGridcentralLine = go.Figure()
@@ -822,4 +899,3 @@ with sidebar:
     else:
         st.title("No file selected - Select a file in sidebar")
         st.sidebar.write("No file selected")
-
