@@ -43,6 +43,8 @@ tarnanogrid = None
 dfnanogridL1 = None
 dfnanogridL2 = None
 dfnanogridL3 = None
+dfnanogridall = None
+dfnanogridallReserved = None
 dfnanogridL1Reserved = None
 dfnanogridL2Reserved = None
 dfnanogridL3Reserved = None
@@ -370,22 +372,23 @@ with sidebar:
                 try:
                     dfnanogridL1 = dfnanogridPhase.get_group('"L1"')
                 except KeyError:
-                    with nanogridcol1:
-                        st.error("No load registered on L1 in Nanogrid")
+                    pass
 
             if dfnanogridPhase:
                 try:
                     dfnanogridL2 = dfnanogridPhase.get_group('"L2"')
                 except KeyError:
-                    with nanogridcol1:
-                        st.error("No load registered on L2 in Nanogrid")
+                    pass
             if dfnanogridPhase:
                 try:
                     dfnanogridL3 = dfnanogridPhase.get_group('"L3"')
                 except KeyError:
-                    with nanogridcol1:
-                        st.error("No load registered on L3 in Nanogrid")
-
+                    pass
+            if dfnanogridPhase:
+                try:
+                    dfnanogridall = dfnanogridPhase.get_group('"All"')
+                except KeyError:
+                    pass
 
             dfTotal = pd.DataFrame()
 
@@ -418,6 +421,10 @@ with sidebar:
                 dfnanogridL3Reserved = dfnanogridL3.pivot(values=['Reserved A'], index=['Time'], columns=['CBID'])
                 dfnanogridL3Reserved.interpolate(method='linear', axis=0, inplace=True)
                 dfTotal['L3'] = dfnanogridL3Reserved[list(dfnanogridL3Reserved.columns)].sum(axis=1).copy()
+            if dfnanogridall is not None:
+                dfnanogridallReserved = dfnanogridall.pivot(values=['Reserved A'], index=['Time'], columns=['CBID'])
+                dfnanogridallReserved.interpolate(method='linear', axis=0, inplace=True)
+                dfTotal['3Phase'] = dfnanogridallReserved[list(dfnanogridallReserved.columns)].sum(axis=1).copy()
 
 
             dfTotal.interpolate(method='pad', axis=0, inplace=True)
@@ -457,7 +464,17 @@ with sidebar:
                                                      line=dict(width=2, color='#A6A6A6'),
                                                      opacity=1, ))
 
-
+            if dfnanogridall is not None:
+                dfnanogridallReserved = dfnanogridallReserved.stack(1)
+                dfnanogridallReserved.reset_index(inplace=True)
+                dfnanogridallReserved = dict(tuple(dfnanogridallReserved.groupby('CBID')))
+                displayreserved(dfnanogridallReserved, '3Phase')
+                figNanogridLine.add_trace(go.Scatter(x=dfTotal.Time, y=dfTotal['3Phase'],
+                                                     legendgrouptitle_text='TotalReserved',
+                                                     legendgroup='TotalReserved',
+                                                     mode='lines', name="3Phase Total",
+                                                     line=dict(width=2, color='#A6A6A6'),
+                                                     opacity=1, ))
 # -- Visualize and structure of the data
 
         with header:
@@ -796,6 +813,40 @@ with sidebar:
             if st.sidebar.checkbox("Nanogrid Allocated", value=True):
                 st.subheader('Nanogrid Allocated')
                 st.write(figNanogridLine)
+                def NanogridTable(X):
+                    fignanogridTable = go.Figure(data=[go.Table(
+                        header=dict(values=list(X.columns),
+                                    fill_color="#869bad",
+                                    align="left"),
+                        cells=dict(values=[X.Time,
+                                           X['CBID'],
+                                           X['Reserved A'],
+                                           X['OutletStatus'],
+                                           X['Phase'],
+                                           ],
+                                   fill_color="#f6f8fb",
+                                   align="left",
+                                   height=25),
+                        columnwidth=[1.5, 0.8, 0.5, 1, 1, 1, 1]
+                    )])
+                    fignanogridTable.update_layout(
+                        margin_l=0, margin_r=15, margin_t=0, margin_b=0, margin_pad=0,
+                        width=1900, height=400,
+                        font_size=14)
+                    st.write(fignanogridTable)
+                if dfnanogridall is not None:
+                    st.subheader("Nanogrid allocated 3-phase")
+                    NanogridTable(dfnanogridall)
+                if dfnanogridL1 is not None:
+                    st.subheader("Nanogrid allocated L1")
+                    NanogridTable(dfnanogridL1)
+                if dfnanogridL2 is not None:
+                    st.subheader("Nanogrid allocated L2")
+                    NanogridTable(dfnanogridL2)
+                if dfnanogridL3 is not None:
+                    st.subheader("Nanogrid allocated L3")
+                    NanogridTable(dfnanogridL3)
+
 
         if dfgridcentral is not None:
             if st.sidebar.checkbox("Gridcentral Measured Load", value=True):
@@ -899,3 +950,10 @@ with sidebar:
     else:
         st.title("No file selected - Select a file in sidebar")
         st.sidebar.write("No file selected")
+
+if file:
+    def convert_df(df):
+        return df.to_csv(index=False).encode('utf-8')
+    csv = convert_df(dfMessages)
+    csvName = CBID +" JournalMessages"
+    st.sidebar.download_button("Extract Diagnostics -- button that might work in the future.", help="Dont you do it", data= csv, mime='text/csv', file_name=csvName)
